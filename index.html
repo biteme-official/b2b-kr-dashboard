@@ -110,6 +110,16 @@ tbody tr:hover{background:#f9fafb}
     </div>
     <div class="header-right">
       <div class="period-btns" id="periodBtns"></div>
+      <div style="position:relative">
+        <button class="btn" id="customPeriodBtn" onclick="toggleCustomPanel()">기간설정</button>
+        <div id="customPeriodPanel" style="display:none;position:absolute;top:36px;right:0;background:#fff;border:1px solid var(--border);border-radius:10px;box-shadow:0 4px 12px rgba(0,0,0,0.08);padding:14px;z-index:300;width:220px">
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <label style="font-size:11px;color:var(--text2)">시작일<input type="date" id="customStartInp" style="width:100%;margin-top:2px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;box-sizing:border-box"></label>
+            <label style="font-size:11px;color:var(--text2)">종료일<input type="date" id="customEndInp" style="width:100%;margin-top:2px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;box-sizing:border-box"></label>
+            <button class="btn btn-primary btn-sm" onclick="applyCustomPeriod()" style="justify-content:center">적용</button>
+          </div>
+        </div>
+      </div>
       <button class="btn btn-dark" onclick="loadData(true)">새로고침</button>
     </div>
   </div>
@@ -153,6 +163,7 @@ let cmpPreset='prev';
 let sum7,sump7,wow,ord7,ordp7,wowOrd,aov,aovp,wowAov,periodLabel,periodDateRange;
 let curYM,monthSum,monthOrd,mom,prevYM;
 let curData=[],prevData=[];
+let customStart=null,customEnd=null;
 
 function fmtKRW(n) {
   if(n>=100000000) return (n/100000000).toFixed(1)+'억';
@@ -222,6 +233,14 @@ function calcMetrics() {
     prevData=ds.filter(d=>d.date.startsWith(prevPrevYM));
     periodLabel='지난달';
     periodDateRange=prevYM.slice(5).replace(/^0/,'')+'월';
+  } else if(curPeriod==='custom'){
+    curData=ds.filter(d=>d.date>=customStart&&d.date<=customEnd);
+    const days=Math.round((new Date(customEnd)-new Date(customStart))/86400000)+1;
+    const cpStart=addDays(customStart,-days);
+    const cpEnd=addDays(customStart,-1);
+    prevData=ds.filter(d=>d.date>=cpStart&&d.date<=cpEnd);
+    periodLabel='기간설정';
+    periodDateRange=customStart.slice(5).replace('-','/')+'~'+customEnd.slice(5).replace('-','/');
   }
 
   if(cmpPreset==='prevWeek'&&compareMode==='preset'){
@@ -256,6 +275,8 @@ function renderPeriodBtns() {
   document.getElementById('periodBtns').innerHTML = PERIODS.map(p =>
     `<button class="period-btn ${curPeriod===p.id?'active':''}" onclick="setPeriod('${p.id}')">${p.label}</button>`
   ).join('');
+  const customBtn=document.getElementById('customPeriodBtn');
+  if(customBtn) customBtn.classList.toggle('btn-primary', curPeriod==='custom');
   document.getElementById('periodLabel').innerHTML = periodLabel+' <span class="time">'+periodDateRange+'</span>';
   const badge=document.getElementById('periodBadge');
   if(compareMode==='preset') badge.innerHTML=`<span class="period-badge">vs ${cmpPreset==='prev'?'전기간':cmpPreset==='prevWeek'?'전주':'전월'}</span>`;
@@ -277,6 +298,27 @@ function setCmpMode(mode) {
   document.querySelectorAll('.cmp-mode').forEach(b=>b.classList.remove('active'));
   document.querySelectorAll('.cmp-mode').forEach(b=>{if(b.textContent===(mode==='preset'?'프리셋':'끄기'))b.classList.add('active');});
   document.getElementById('cmpPresets').style.display=mode==='preset'?'':'none';
+  calcMetrics();
+  renderPeriodBtns();
+  renderKPI();
+  renderPartCards();
+  renderHourlyChart();
+  renderProductRank();
+}
+
+function toggleCustomPanel() {
+  const p = document.getElementById('customPeriodPanel');
+  p.style.display = p.style.display==='block' ? 'none' : 'block';
+}
+
+function applyCustomPeriod() {
+  const s = document.getElementById('customStartInp').value;
+  const e = document.getElementById('customEndInp').value;
+  if (!s || !e || s > e) { alert('올바른 기간을 선택해주세요.'); return; }
+  customStart = s;
+  customEnd = e;
+  curPeriod = 'custom';
+  document.getElementById('customPeriodPanel').style.display = 'none';
   calcMetrics();
   renderPeriodBtns();
   renderKPI();
@@ -444,6 +486,14 @@ async function loadData(isRefresh) {
     document.title = 'ERROR: ' + e.message;
   }
 }
+
+document.addEventListener('click', function(e) {
+  const panel = document.getElementById('customPeriodPanel');
+  const btn = document.getElementById('customPeriodBtn');
+  if (panel && panel.style.display==='block' && !panel.contains(e.target) && !btn.contains(e.target)) {
+    panel.style.display = 'none';
+  }
+});
 
 loadData(false);
 setInterval(function(){ loadData(true); }, 300000);
